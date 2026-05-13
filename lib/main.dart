@@ -1,120 +1,407 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'add_product_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'product.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'welcome_screen.dart';
+import 'recipe.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Hive.initFlutter();
+  Hive.registerAdapter(ProductAdapter());
+  Hive.registerAdapter(RecipeAdapter());
+  await Hive.openBox<Product>('products');
+  await Hive.openBox<Recipe>('recipes');
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      locale: const Locale('ru', 'RU'),
+      supportedLocales: const [
+        Locale('ru', 'RU'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      debugShowCheckedModeBanner: false,
+
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        fontFamily: 'Huninn',
+        scaffoldBackgroundColor: const Color(0xFFD2B48C),
+
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Color(0xFF808000),
+          selectionHandleColor: Color(0xFF808000),
+        ),
+
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF808000),
+          primary: const Color(0xFF808000),
+          background: const Color(0xFFD2B48C),
+          surface: const Color(0xFFD2B48C),
+          onPrimary: const Color(0xFFD2B48C),
+          onSurface: Colors.black,
+        ),
+
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF808000)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF808000), width: 2),
+          ),
+          labelStyle: TextStyle(color: Colors.black),
+        ),
+
+        canvasColor: const Color(0xFFD2B48C),
+        cardColor: const Color(0xFFD2B48C),
+
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.black),
+          bodyMedium: TextStyle(color: Colors.black),
+          bodySmall: TextStyle(color: Colors.black),
+        ),
+
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFD2B48C),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          titleTextStyle: TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.black),
+        ),
+
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF808000),
+            foregroundColor: const Color(0xFFD2B48C),
+            textStyle: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+
+      home: const WelcomeScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _HomeScreenState extends State<HomeScreen> {
+  List<Product> products = [];
+  final box = Hive.box<Product>('products');
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    products = box.values.cast<Product>().toList();
+    sortProducts();
+  }
+
+  void sortProducts() {
+    products.sort(
+          (a, b) => a.expirationDate.compareTo(b.expirationDate),
+    );
+  }
+
+  Color getColor(Product product) {
+    final now = DateTime.now();
+    final diff = product.expirationDate.difference(now).inDays;
+
+    if (diff <= 0) return Colors.red;
+    if (diff <= 3) return Colors.orange;
+    return Colors.green;
+  }
+
+  String formatDate(DateTime date) {
+    return '${date.day}.${date.month}.${date.year}';
+  }
+
+  Future<void> generateRecipe() async {
+    final apiKey = 'API_KEY';
+
+    final productNames = products.map((p) => p.name).join(', ');
+
+    final response = await http.post(
+      Uri.parse('https://api.cerebras.ai/v1/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $apiKey',
+      },
+      body: jsonEncode({
+        "model": "llama3.1-8b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Придумай простой рецепт из этих продуктов: $productNames"
+          }
+        ]
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final text = data['choices'][0]['message']['content'];
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Рецепт'),
+          content: SingleChildScrollView(child: Text(text)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка генерации рецепта')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Mise'),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: products.isEmpty
+          ? const Center(
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('You have pushed the button this many times:'),
+            Icon(Icons.inventory_2, size: 64, color: Color(0xFFA0522D)),
+            SizedBox(height: 16),
             Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'Список продуктов пуст',
+              style:
+              TextStyle(fontSize: 18, color: Color(0xFFA0522D)),
             ),
           ],
         ),
+      )
+          : Builder(
+        builder: (context) {
+          final now = DateTime.now();
+
+          final urgent = products.where((p) {
+            final diff = p.expirationDate.difference(now).inDays;
+            return diff <= 3;
+          }).toList();
+
+          final normal = products.where((p) {
+            final diff = p.expirationDate.difference(now).inDays;
+            return diff > 3;
+          }).toList();
+
+          return ListView(
+            children: [
+              if (urgent.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Скоро испортится',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+                ...urgent.map((product) {
+                  final index = products.indexOf(product);
+
+                  return ListTile(
+                    leading: Icon(
+                      Icons.circle,
+                      color: getColor(product),
+                      size: 12,
+                    ),
+                    title: Text(product.name),
+                    subtitle: Text('до ${formatDate(product.expirationDate)}'),
+
+                    onTap: () async {
+                      final updated = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddProductScreen(
+                            existingProduct: product,
+                          ),
+                        ),
+                      );
+
+                      if (updated != null && updated is Product) {
+                        setState(() {
+                          final key = box.keyAt(index);
+                          box.put(key, updated);
+                          products[index] = updated;
+                          sortProducts();
+                        });
+                      }
+                    },
+
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Удалить?'),
+                            content: const Text('Ты уверен?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Отмена'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    final key = box.keyAt(index);
+                                    box.delete(key);
+                                    products.removeAt(index);
+                                  });
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Удалить'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }),
+              ],
+
+              if (normal.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Остальное',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ...normal.map((product) {
+                  final index = products.indexOf(product);
+
+                  return ListTile(
+                    leading: Icon(
+                      Icons.circle,
+                      color: getColor(product),
+                      size: 12,
+                    ),
+                    title: Text(product.name),
+                    subtitle: Text('до ${formatDate(product.expirationDate)}'),
+
+                    onTap: () async {
+                      final updated = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddProductScreen(
+                            existingProduct: product,
+                          ),
+                        ),
+                      );
+
+                      if (updated != null && updated is Product) {
+                        setState(() {
+                          final key = box.keyAt(index);
+                          box.put(key, updated);
+                          products[index] = updated;
+                          sortProducts();
+                        });
+                      }
+                    },
+
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Удалить?'),
+                            content: const Text('Ты уверен?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Отмена'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    final key = box.keyAt(index);
+                                    box.delete(key);
+                                    products.removeAt(index);
+                                  });
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Удалить'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
+        backgroundColor: const Color(0xFF808000),
+        foregroundColor: const Color(0xFFD2B48C),
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AddProductScreen(),
+            ),
+          );
+
+          if (result != null && result is Product) {
+            setState(() {
+              box.add(result);
+              products.add(result);
+              sortProducts();
+            });
+          }
+        },
         child: const Icon(Icons.add),
       ),
     );
