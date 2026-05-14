@@ -35,7 +35,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://192.168.19.34:3000/recipe'),
+        Uri.parse('https://mise-backend-m66q.onrender.com/recipe'),
         headers: {
           'Content-Type': 'application/json',
         },
