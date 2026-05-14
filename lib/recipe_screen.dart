@@ -29,12 +29,11 @@ class _RecipeScreenState extends State<RecipeScreen> {
       isLoading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 300));
-
     final productNames = widget.products.map((p) => p.name).toList();
 
     try {
-      final response = await http.post(
+      final response = await http
+          .post(
         Uri.parse('https://mise-backend-m66q.onrender.com/recipe'),
         headers: {
           'Content-Type': 'application/json',
@@ -42,24 +41,25 @@ class _RecipeScreenState extends State<RecipeScreen> {
         body: jsonEncode({
           "products": productNames,
         }),
-      );
+      )
+          .timeout(const Duration(seconds: 15)); // 👈 важно
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
         setState(() {
-          recipe = data['recipe'];
+          recipe = data['recipe'] ?? 'Ошибка формата ответа';
           isLoading = false;
         });
       } else {
         setState(() {
-          recipe = 'Ошибка сервера';
+          recipe = 'Ошибка сервера (${response.statusCode})';
           isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        recipe = 'Нет соединения с сервером';
+        recipe = 'Сервер не отвечает (возможно, проснулся Render)';
         isLoading = false;
       });
     }
