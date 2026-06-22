@@ -19,17 +19,20 @@ class ProductAdapter extends TypeAdapter<Product> {
     return Product(
       name: fields[0] as String,
       expirationDate: fields[1] as DateTime,
+      category: fields[2] as String,
     );
   }
 
   @override
   void write(BinaryWriter writer, Product obj) {
     writer
-      ..writeByte(2)
+      ..writeByte(3)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
-      ..write(obj.expirationDate);
+      ..write(obj.expirationDate)
+      ..writeByte(2)
+      ..write(obj.category);
   }
 
   @override

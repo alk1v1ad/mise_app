@@ -10,8 +10,12 @@ class Product {
   @HiveField(1)
   final DateTime expirationDate;
 
+  @HiveField(2)
+  final String category;
+
   Product({
     required this.name,
     required this.expirationDate,
+    required this.category,
   });
 }

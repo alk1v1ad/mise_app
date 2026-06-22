@@ -89,6 +89,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 final product = Product(
                   name: name,
                   expirationDate: DateTime(year, month, day),
+                  category: 'Другое', // 👈 временно
                 );
 
                 Navigator.pop(context, product);
