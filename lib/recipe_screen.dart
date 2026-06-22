@@ -29,7 +29,50 @@ class _RecipeScreenState extends State<RecipeScreen> {
       isLoading = true;
     });
 
-    final productNames = widget.products.map((p) => p.name).toList();
+    // 🔥 1. Копируем и сортируем по сроку
+    final products = [...widget.products];
+
+    products.sort(
+          (a, b) => a.expirationDate.compareTo(b.expirationDate),
+    );
+
+    // 🔥 2. Группируем (УЖЕ отсортированные!)
+    final meat = products.where((p) => p.category == 'Мясо').toList();
+    final fish = products.where((p) => p.category == 'Рыба').toList();
+    final veggies = products.where((p) => p.category == 'Овощи').toList();
+    final other = products.where((p) =>
+    p.category != 'Мясо' &&
+        p.category != 'Рыба' &&
+        p.category != 'Овощи'
+    ).toList();
+
+    final selected = <Product>[];
+
+    // 🔥 3. Основа (самый СРОЧНЫЙ!)
+    if (meat.isNotEmpty) {
+      selected.add(meat.first);
+    } else if (fish.isNotEmpty) {
+      selected.add(fish.first);
+    }
+
+    // 🔥 4. Овощи (тоже по сроку)
+    selected.addAll(veggies.take(2));
+
+    // 🔥 5. Остальное (минимум)
+    selected.addAll(other.take(2));
+
+    // ❗ если вдруг вообще пусто
+    if (selected.isEmpty && products.isNotEmpty) {
+      selected.addAll(products.take(3));
+    }
+
+    // 🔥 6. Формируем строку для AI
+    final productNames = selected.map((p) {
+      final daysLeft =
+          p.expirationDate.difference(DateTime.now()).inDays;
+
+      return "${p.name} (${p.quantity}) [срок: $daysLeft дн.]";
+    }).toList();
 
     try {
       final response = await http
@@ -42,13 +85,13 @@ class _RecipeScreenState extends State<RecipeScreen> {
           "products": productNames,
         }),
       )
-          .timeout(const Duration(seconds: 15)); // 👈 важно
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
         setState(() {
-          recipe = data['recipe'] ?? 'Ошибка формата ответа';
+          recipe = data['recipe'];
           isLoading = false;
         });
       } else {
@@ -59,7 +102,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
       }
     } catch (e) {
       setState(() {
-        recipe = 'Сервер не отвечает (возможно, проснулся Render)';
+        recipe = 'Сервер не отвечает (возможно, Render проснулся)';
         isLoading = false;
       });
     }
@@ -67,105 +110,92 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
   // 🔥 РАЗБОР РЕЦЕПТА
   Widget _buildRecipeContent() {
-    final lines = recipe.split('\n');
+    try {
+      final decoded = jsonDecode(recipe);
 
-    String title = '';
-    List<String> ingredients = [];
-    List<String> steps = [];
+      final String title = decoded['title'] ?? '';
+      final List<String> ingredients =
+      List<String>.from(decoded['usedIngredients'] ?? []);
 
-    String current = '';
+      final List<String> steps =
+      List<String>.from(decoded['steps'] ?? []);
 
-    for (var line in lines) {
-      final trimmed = line.trim();
-
-      if (trimmed.startsWith('TITLE:')) {
-        title = trimmed.replaceFirst('TITLE:', '').trim();
-        current = '';
-        continue;
-      }
-
-      if (trimmed.startsWith('INGREDIENTS')) {
-        current = 'ingredients';
-        continue;
-      }
-
-      if (trimmed.startsWith('STEPS')) {
-        current = 'steps';
-        continue;
-      }
-
-      if (current == 'ingredients' && trimmed.isNotEmpty) {
-        ingredients.add(trimmed.replaceFirst('-', '').trim());
-      }
-
-      if (current == 'steps' && trimmed.isNotEmpty) {
-        steps.add(trimmed.replaceFirst(RegExp(r'^\d+\.\s*'), ''));
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6D3A3),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title.isNotEmpty) ...[
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
-
-          if (ingredients.isNotEmpty) ...[
-            const Text(
-              'Ингредиенты',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...ingredients.map(
-                  (e) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Text('• $e'),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-
-          if (steps.isNotEmpty) ...[
-            const Text(
-              'Инструкции',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...steps.asMap().entries.map(
-                  (entry) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${entry.key + 1}. '),
-                    Expanded(child: Text(entry.value)),
-                  ],
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6D3A3),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 🔥 TITLE
+            if (title.isNotEmpty) ...[
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
+              const SizedBox(height: 18),
+            ],
+
+            // 🔥 INGREDIENTS
+            if (ingredients.isNotEmpty) ...[
+              const Text(
+                'Ингредиенты',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...ingredients.map(
+                    (e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text('• $e'),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // 🔥 STEPS
+            if (steps.isNotEmpty) ...[
+              const Text(
+                'Инструкции',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...steps.asMap().entries.map(
+                    (entry) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${entry.key + 1}. '),
+                      Expanded(child: Text(entry.value)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
-      ),
-    );
+        ),
+      );
+    } catch (e) {
+      // fallback если JSON сломался
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: const Text(
+          'Ошибка отображения рецепта',
+          style: TextStyle(color: Colors.black),
+        ),
+      );
+    }
   }
 
   @override

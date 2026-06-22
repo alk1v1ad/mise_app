@@ -13,9 +13,13 @@ class Product {
   @HiveField(2)
   final String category;
 
+  @HiveField(3)
+  final String quantity;
+
   Product({
     required this.name,
     required this.expirationDate,
     required this.category,
+    required this.quantity,
   });
 }

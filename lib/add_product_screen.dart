@@ -13,6 +13,21 @@ class AddProductScreen extends StatefulWidget {
 class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
+  final TextEditingController quantityController = TextEditingController();
+
+  String selectedCategory = 'Другое';
+
+  final List<String> categories = [
+    'Мясо',
+    'Рыба',
+    'Овощи',
+    'Фрукты',
+    'Молочка',
+    'Крупы',
+    'Сладкое',
+    'Напитки',
+    'Другое',
+  ];
 
   @override
   void initState() {
@@ -23,6 +38,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       final d = widget.existingProduct!.expirationDate;
       dateController.text = "${d.day}.${d.month}.${d.year}";
+
+      selectedCategory = widget.existingProduct!.category;
     }
   }
 
@@ -34,69 +51,132 @@ class _AddProductScreenState extends State<AddProductScreen> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Название продукта',
-                border: OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🔹 Название
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Название продукта',
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: dateController,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Срок годности',
-                border: OutlineInputBorder(),
+
+              const SizedBox(height: 12),
+
+              // Количество
+              TextField(
+                controller: quantityController,
+                decoration: const InputDecoration(
+                  labelText: 'Количество (например: 200г, 2 шт)',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              onTap: () async {
-                DateTime? pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2100),
-                );
+              const SizedBox(height: 10),
 
-                if (pickedDate != null) {
-                  String formatted =
-                      "${pickedDate.day}.${pickedDate.month}.${pickedDate.year}";
-                  dateController.text = formatted;
-                }
-              },
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                String name = nameController.text;
-                String date = dateController.text;
-
-                if (name.isEmpty || date.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Заполни все поля'),
-                    ),
+              // 🔹 Дата
+              TextField(
+                controller: dateController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Срок годности',
+                  border: OutlineInputBorder(),
+                ),
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime(2100),
                   );
-                  return;
-                }
 
-                final parts = date.split('.');
-                final day = int.parse(parts[0]);
-                final month = int.parse(parts[1]);
-                final year = int.parse(parts[2]);
+                  if (pickedDate != null) {
+                    dateController.text =
+                    "${pickedDate.day}.${pickedDate.month}.${pickedDate.year}";
+                  }
+                },
+              ),
 
-                final product = Product(
-                  name: name,
-                  expirationDate: DateTime(year, month, day),
-                  category: 'Другое', // 👈 временно
-                );
+              const SizedBox(height: 16),
 
-                Navigator.pop(context, product);
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
+              // 🔹 Категория
+              const Text(
+                'Категория',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+
+
+
+              const SizedBox(height: 10),
+
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: categories.map((category) {
+                  final isSelected = selectedCategory == category;
+
+                  return ChoiceChip(
+                    label: Text(category),
+                    selected: isSelected,
+                    selectedColor: const Color(0xFF808000),
+                    labelStyle: TextStyle(
+                      color:
+                      isSelected ? const Color(0xFFD2B48C) : Colors.black,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    onSelected: (_) {
+                      setState(() {
+                        selectedCategory = category;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 🔹 Кнопка
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final name = nameController.text;
+                    final date = dateController.text;
+
+                    if (name.isEmpty || date.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Заполни все поля'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final parts = date.split('.');
+                    final day = int.parse(parts[0]);
+                    final month = int.parse(parts[1]);
+                    final year = int.parse(parts[2]);
+
+                    final product = Product(
+                      name: name,
+                      expirationDate: DateTime(year, month, day),
+                      category: selectedCategory,
+                      quantity: quantityController.text,
+                    );
+
+                    Navigator.pop(context, product);
+                  },
+                  child: const Text('Сохранить'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
