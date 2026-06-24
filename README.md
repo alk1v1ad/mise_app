@@ -76,56 +76,6 @@ Flutter App → Backend (Node.js) → AI API → Backend → Flutter UI
 
 ---
 
-## ⚙️ Getting Started
-
-### 1. Clone repo
-
-```bash id="ghclone"
-git clone https://github.com/your-username/mise.git
-cd mise
-```
-
----
-
-### 2. Run backend
-
-```bash id="backendrun"
-cd backend
-npm install
-nodemon server.js
-```
-
----
-
-### 3. Run app
-
-```bash id="flutterrun"
-flutter pub get
-flutter run
-```
-
----
-
-## ❗ Configuration
-
-If running on a real device:
-
-Replace:
-
-```dart id="localhost"
-http://10.0.2.2:3000
-```
-
-with your PC IP:
-
-```dart id="ipreplace"
-http://XXX.XXX.X.X:3000
-```
-
----
-
-
-
 ## 🔥 Highlights
 
 * Clean UI with structured recipe rendering
