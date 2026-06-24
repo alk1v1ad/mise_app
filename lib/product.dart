@@ -3,18 +3,18 @@ import 'package:hive/hive.dart';
 part 'product.g.dart';
 
 @HiveType(typeId: 0)
-class Product {
+class Product extends HiveObject {
   @HiveField(0)
-  final String name;
+  String name;
 
   @HiveField(1)
-  final DateTime expirationDate;
+  DateTime expirationDate;
 
   @HiveField(2)
-  final String category;
+  String category;
 
   @HiveField(3)
-  final String quantity;
+  String quantity;
 
   Product({
     required this.name,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'product.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'parsed_recipe.dart';
 import 'recipe.dart';
 
 class RecipeScreen extends StatefulWidget {
@@ -110,39 +112,30 @@ class _RecipeScreenState extends State<RecipeScreen> {
 
   // 🔥 РАЗБОР РЕЦЕПТА
   Widget _buildRecipeContent() {
-    try {
-      final decoded = jsonDecode(recipe);
+    final parsed = ParsedRecipe.fromText(recipe);
 
-      final String title = decoded['title'] ?? '';
-      final List<String> ingredients =
-      List<String>.from(decoded['usedIngredients'] ?? []);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.recipeSurface,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            parsed.title,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
 
-      final List<String> steps =
-      List<String>.from(decoded['steps'] ?? []);
-
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE6D3A3),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🔥 TITLE
-            if (title.isNotEmpty) ...[
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 18),
-            ],
-
-            // 🔥 INGREDIENTS
-            if (ingredients.isNotEmpty) ...[
+          if (!parsed.isStructured) ...[
+            Text(parsed.fallbackText),
+          ] else ...[
+            if (parsed.ingredients.isNotEmpty) ...[
               const Text(
                 'Ингредиенты',
                 style: TextStyle(
@@ -151,8 +144,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              ...ingredients.map(
-                    (e) => Padding(
+              ...parsed.ingredients.map(
+                (e) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Text('• $e'),
                 ),
@@ -160,8 +153,7 @@ class _RecipeScreenState extends State<RecipeScreen> {
               const SizedBox(height: 20),
             ],
 
-            // 🔥 STEPS
-            if (steps.isNotEmpty) ...[
+            if (parsed.steps.isNotEmpty) ...[
               const Text(
                 'Инструкции',
                 style: TextStyle(
@@ -170,8 +162,8 @@ class _RecipeScreenState extends State<RecipeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              ...steps.asMap().entries.map(
-                    (entry) => Padding(
+              ...parsed.steps.asMap().entries.map(
+                (entry) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,18 +176,9 @@ class _RecipeScreenState extends State<RecipeScreen> {
               ),
             ],
           ],
-        ),
-      );
-    } catch (e) {
-      // fallback если JSON сломался
-      return Container(
-        padding: const EdgeInsets.all(16),
-        child: const Text(
-          'Ошибка отображения рецепта',
-          style: TextStyle(color: Colors.black),
-        ),
-      );
-    }
+        ],
+      ),
+    );
   }
 
   @override

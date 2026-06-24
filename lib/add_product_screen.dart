@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_colors.dart';
 import 'product.dart';
 
 class AddProductScreen extends StatefulWidget {
@@ -14,6 +15,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController dateController = TextEditingController();
   final TextEditingController quantityController = TextEditingController();
+  DateTime? selectedDate;
+
 
   String selectedCategory = 'Другое';
 
@@ -37,10 +40,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
       nameController.text = widget.existingProduct!.name;
 
       final d = widget.existingProduct!.expirationDate;
+      selectedDate = d;
       dateController.text = "${d.day}.${d.month}.${d.year}";
 
       selectedCategory = widget.existingProduct!.category;
+      quantityController.text = widget.existingProduct!.quantity;
     }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    dateController.dispose();
+    quantityController.dispose();
+    super.dispose();
   }
 
   @override
@@ -85,14 +98,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   border: OutlineInputBorder(),
                 ),
                 onTap: () async {
+                  final now = DateTime.now();
+                  final initialDate =
+                      selectedDate != null && selectedDate!.isAfter(now)
+                          ? selectedDate!
+                          : now;
                   DateTime? pickedDate = await showDatePicker(
                     context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime.now(),
+                    initialDate: initialDate,
+                    firstDate: now,
                     lastDate: DateTime(2100),
                   );
 
                   if (pickedDate != null) {
+                    selectedDate = pickedDate;
                     dateController.text =
                     "${pickedDate.day}.${pickedDate.month}.${pickedDate.year}";
                   }
@@ -123,10 +142,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   return ChoiceChip(
                     label: Text(category),
                     selected: isSelected,
-                    selectedColor: const Color(0xFF808000),
+                    selectedColor: AppColors.primary,
                     labelStyle: TextStyle(
                       color:
-                      isSelected ? const Color(0xFFD2B48C) : Colors.black,
+                      isSelected ? AppColors.background : Colors.black,
                       fontWeight: FontWeight.w500,
                     ),
                     onSelected: (_) {
@@ -146,10 +165,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 height: 50,
                 child: ElevatedButton(
                   onPressed: () {
-                    final name = nameController.text;
-                    final date = dateController.text;
+                    final name = nameController.text.trim();
 
-                    if (name.isEmpty || date.isEmpty) {
+                    if (name.isEmpty || selectedDate == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Заполни все поля'),
@@ -158,16 +176,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       return;
                     }
 
-                    final parts = date.split('.');
-                    final day = int.parse(parts[0]);
-                    final month = int.parse(parts[1]);
-                    final year = int.parse(parts[2]);
 
                     final product = Product(
                       name: name,
-                      expirationDate: DateTime(year, month, day),
+                      expirationDate: selectedDate!,
                       category: selectedCategory,
-                      quantity: quantityController.text,
+                      quantity: quantityController.text.trim(),
                     );
 
                     Navigator.pop(context, product);

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'app_colors.dart';
+import 'parsed_recipe.dart';
 import 'recipe.dart';
-import 'dart:convert';
 
 class SavedRecipesScreen extends StatelessWidget {
   const SavedRecipesScreen({super.key});
@@ -86,85 +87,94 @@ class _RecipeCardState extends State<_RecipeCard> {
 
   @override
   Widget build(BuildContext context) {
-    try {
-      final decoded = jsonDecode(widget.recipeText);
+    final parsed = ParsedRecipe.fromText(widget.recipeText);
+    final previewIngredients = parsed.ingredients.take(3).toList();
 
-      final title = decoded['title'] ?? '';
-      final ingredients =
-      List<String>.from(decoded['usedIngredients'] ?? []);
-
-      return AnimatedScale(
-        scale: scale,
-        duration: const Duration(milliseconds: 100),
-        child: GestureDetector(
-          onTapDown: (_) => setState(() => scale = 0.97),
-          onTapUp: (_) => setState(() => scale = 1),
-          onTapCancel: () => setState(() => scale = 1),
-          onTap: () {
-            Navigator.push(
-              context,
-              PageRouteBuilder(
-                transitionDuration: const Duration(milliseconds: 250),
-                pageBuilder: (_, animation, __) => FadeTransition(
-                  opacity: animation,
-                  child: _RecipeDetailPage(
-                    recipeText: widget.recipeText,
-                  ),
+    return AnimatedScale(
+      scale: scale,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => scale = 0.97),
+        onTapUp: (_) => setState(() => scale = 1),
+        onTapCancel: () => setState(() => scale = 1),
+        onTap: () {
+          Navigator.push(
+            context,
+            PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 250),
+              pageBuilder: (_, animation, __) => FadeTransition(
+                opacity: animation,
+                child: _RecipeDetailPage(
+                  recipeText: widget.recipeText,
                 ),
               ),
-            );
-          },
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
             ),
-            elevation: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+          );
+        },
+        child: Card(
+          color: AppColors.recipeSurface,
+          surfaceTintColor: Colors.transparent,
+          margin: const EdgeInsets.only(bottom: 14),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(
+              color: AppColors.recipeBorder,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 2,
+          shadowColor: Colors.black26,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        parsed.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: widget.onDelete,
-                      )
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: widget.onDelete,
+                    )
+                  ],
+                ),
 
-                  const SizedBox(height: 6),
+                const SizedBox(height: 6),
 
-                  Text(
-                    '${widget.date.day}.${widget.date.month}.${widget.date.year}',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
+                Text(
+                  '${widget.date.day}.${widget.date.month}.${widget.date.year}',
+                  style: const TextStyle(color: AppColors.mutedText),
+                ),
 
-                  const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-                  ...ingredients.take(3).map((e) => Text('• $e')),
-
-                  if (ingredients.length > 3)
+                if (previewIngredients.isNotEmpty) ...[
+                  ...previewIngredients.map((e) => Text('• $e')),
+                  if (parsed.ingredients.length > previewIngredients.length)
                     const Text('...'),
-                ],
-              ),
+                ] else
+                  Text(
+                    parsed.fallbackText,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
           ),
         ),
-      );
-    } catch (e) {
-      return const SizedBox();
-    }
+      ),
+    );
   }
 }
 
@@ -175,20 +185,14 @@ class _RecipeDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final decoded = jsonDecode(recipeText);
-
-    final title = decoded['title'] ?? '';
-    final ingredients =
-    List<String>.from(decoded['usedIngredients'] ?? []);
-    final steps =
-    List<String>.from(decoded['steps'] ?? []);
+    final parsed = ParsedRecipe.fromText(recipeText);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(title),
+        title: Text(parsed.title),
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
         foregroundColor: Colors.black,
       ),
       body: SingleChildScrollView(
@@ -196,32 +200,19 @@ class _RecipeDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Ингредиенты',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+            if (!parsed.isStructured) ...[
+              Text(parsed.fallbackText),
+            ] else ...[
+              ...parsed.ingredients.map((e) => Text('• $e')),
+              if (parsed.ingredients.isNotEmpty && parsed.steps.isNotEmpty)
+                const SizedBox(height: 20),
+              ...parsed.steps.asMap().entries.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('${e.key + 1}. ${e.value}'),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            ...ingredients.map((e) => Text('• $e')),
-
-            const SizedBox(height: 20),
-
-            const Text(
-              'Шаги',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ...steps.asMap().entries.map(
-                  (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text('${e.key + 1}. ${e.value}'),
-              ),
-            ),
+            ],
           ],
         ),
       ),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'app_colors.dart';
 import 'add_product_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'product.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'welcome_screen.dart';
 import 'recipe.dart';
 
@@ -39,35 +38,35 @@ class MyApp extends StatelessWidget {
 
       theme: ThemeData(
         fontFamily: 'Huninn',
-        scaffoldBackgroundColor: const Color(0xFFD2B48C),
+        scaffoldBackgroundColor: AppColors.background,
 
         textSelectionTheme: const TextSelectionThemeData(
-          cursorColor: Color(0xFF808000),
-          selectionHandleColor: Color(0xFF808000),
+          cursorColor: AppColors.primary,
+          selectionHandleColor: AppColors.primary,
         ),
 
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF808000),
-          primary: const Color(0xFF808000),
-          background: const Color(0xFFD2B48C),
-          surface: const Color(0xFFD2B48C),
-          onPrimary: const Color(0xFFD2B48C),
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          background: AppColors.background,
+          surface: AppColors.background,
+          onPrimary: AppColors.background,
           onSurface: Colors.black,
         ),
 
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
           enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF808000)),
+            borderSide: BorderSide(color: AppColors.primary),
           ),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFF808000), width: 2),
+            borderSide: BorderSide(color: AppColors.primary, width: 2),
           ),
           labelStyle: TextStyle(color: Colors.black),
         ),
 
-        canvasColor: const Color(0xFFD2B48C),
-        cardColor: const Color(0xFFD2B48C),
+        canvasColor: AppColors.background,
+        cardColor: AppColors.background,
 
         textTheme: const TextTheme(
           bodyLarge: TextStyle(color: Colors.black),
@@ -76,7 +75,7 @@ class MyApp extends StatelessWidget {
         ),
 
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFD2B48C),
+          backgroundColor: AppColors.background,
           elevation: 0,
           scrolledUnderElevation: 0,
           titleTextStyle: TextStyle(
@@ -89,8 +88,8 @@ class MyApp extends StatelessWidget {
 
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF808000),
-            foregroundColor: const Color(0xFFD2B48C),
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.background,
             textStyle: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -144,50 +143,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${date.day}.${date.month}.${date.year}';
   }
 
-  Future<void> generateRecipe() async {
-    final apiKey = 'API_KEY';
-
-    final productNames = products.map((p) => p.name).join(', ');
-
-    final response = await http.post(
-      Uri.parse('https://api.cerebras.ai/v1/chat/completions'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
-      },
-      body: jsonEncode({
-        "model": "llama3.1-8b",
-        "messages": [
-          {
-            "role": "user",
-            "content": "Придумай простой рецепт из этих продуктов: $productNames"
-          }
-        ]
-      }),
+  Future<void> editProduct(Product product) async {
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddProductScreen(
+          existingProduct: product,
+        ),
+      ),
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final text = data['choices'][0]['message']['content'];
+    if (!mounted || updated is! Product) return;
 
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Рецепт'),
-          content: SingleChildScrollView(child: Text(text)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Закрыть'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка генерации рецепта')),
-      );
-    }
+    product
+      ..name = updated.name
+      ..expirationDate = updated.expirationDate
+      ..category = updated.category
+      ..quantity = updated.quantity;
+
+    await product.save();
+
+    if (!mounted) return;
+    setState(sortProducts);
+  }
+
+  Future<void> deleteProduct(Product product) async {
+    await product.delete();
+
+    if (!mounted) return;
+    setState(() {
+      products.remove(product);
+    });
   }
 
   @override
@@ -201,12 +187,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inventory_2, size: 64, color: Color(0xFFA0522D)),
+            Icon(Icons.inventory_2, size: 64, color: AppColors.emptyState),
             SizedBox(height: 16),
             Text(
               'Список продуктов пуст',
               style:
-              TextStyle(fontSize: 18, color: Color(0xFFA0522D)),
+              TextStyle(fontSize: 18, color: AppColors.emptyState),
             ),
           ],
         ),
@@ -240,8 +226,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 ...urgent.map((product) {
-                  final index = products.indexOf(product);
-
                   return ListTile(
                     leading: Icon(
                       Icons.circle,
@@ -251,25 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: Text(product.name),
                     subtitle: Text('до ${formatDate(product.expirationDate)}'),
 
-                    onTap: () async {
-                      final updated = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddProductScreen(
-                            existingProduct: product,
-                          ),
-                        ),
-                      );
-
-                      if (updated != null && updated is Product) {
-                        setState(() {
-                          final key = box.keyAt(index);
-                          box.put(key, updated);
-                          products[index] = updated;
-                          sortProducts();
-                        });
-                      }
-                    },
+                    onTap: () => editProduct(product),
 
                     trailing: IconButton(
                       icon: const Icon(Icons.delete),
@@ -285,13 +251,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: const Text('Отмена'),
                               ),
                               TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    final key = box.keyAt(index);
-                                    box.delete(key);
-                                    products.removeAt(index);
-                                  });
+                                onPressed: () async {
                                   Navigator.pop(context);
+                                  await deleteProduct(product);
                                 },
                                 child: const Text('Удалить'),
                               ),
@@ -316,8 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 ...normal.map((product) {
-                  final index = products.indexOf(product);
-
                   return ListTile(
                     leading: Icon(
                       Icons.circle,
@@ -327,25 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: Text(product.name),
                     subtitle: Text('до ${formatDate(product.expirationDate)}'),
 
-                    onTap: () async {
-                      final updated = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddProductScreen(
-                            existingProduct: product,
-                          ),
-                        ),
-                      );
-
-                      if (updated != null && updated is Product) {
-                        setState(() {
-                          final key = box.keyAt(index);
-                          box.put(key, updated);
-                          products[index] = updated;
-                          sortProducts();
-                        });
-                      }
-                    },
+                    onTap: () => editProduct(product),
 
                     trailing: IconButton(
                       icon: const Icon(Icons.delete),
@@ -361,13 +303,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: const Text('Отмена'),
                               ),
                               TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    final key = box.keyAt(index);
-                                    box.delete(key);
-                                    products.removeAt(index);
-                                  });
+                                onPressed: () async {
                                   Navigator.pop(context);
+                                  await deleteProduct(product);
                                 },
                                 child: const Text('Удалить'),
                               ),
@@ -384,8 +322,8 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF808000),
-        foregroundColor: const Color(0xFFD2B48C),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.background,
         onPressed: () async {
           final result = await Navigator.push(
             context,
@@ -395,8 +333,9 @@ class _HomeScreenState extends State<HomeScreen> {
           );
 
           if (result != null && result is Product) {
+            await box.add(result);
+            if (!mounted) return;
             setState(() {
-              box.add(result);
               products.add(result);
               sortProducts();
             });
